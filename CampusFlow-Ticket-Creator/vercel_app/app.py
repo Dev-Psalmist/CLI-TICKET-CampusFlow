@@ -75,7 +75,7 @@ def tickets():
  try:return [asdict(x) for x in execute(c,"SELECT * FROM tickets ORDER BY created_at DESC").fetchall()]
  finally:c.close()
 @app.get("/",response_class=HTMLResponse)
-def home(request:Request):return templates.TemplateResponse("index.html",{"request":request})
+def home(request:Request):return templates.TemplateResponse(request=request,name="index.html",context={})
 @app.get("/api/health")
 def health():return {"status":"ok","version":"2.0.0","database":"connected" if DATABASE_URL else "local-only"}
 @app.get("/api/tickets")
