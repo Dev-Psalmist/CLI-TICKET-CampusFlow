@@ -67,7 +67,13 @@ def init_db():
    c.commit()
  finally:c.close()
 @app.on_event("startup")
-def startup():init_db()
+def startup():
+ try:
+  init_db()
+ except Exception:
+  # Keep the web interface available if Supabase credentials are temporarily
+  # incorrect; ticket endpoints will report a clear storage-unavailable error.
+  log.exception("CampusFlow could not initialise its database. Check DATABASE_URL.")
 KEYS=["id","title","description","category","priority","department","reason","status","assigned_to","assigned_at","created_at"]
 def asdict(row):return dict(row) if isinstance(row,sqlite3.Row) else dict(zip(KEYS,row))
 def tickets():
@@ -77,7 +83,17 @@ def tickets():
 @app.get("/",response_class=HTMLResponse)
 def home(request:Request):return templates.TemplateResponse(request=request,name="index.html",context={})
 @app.get("/api/health")
-def health():return {"status":"ok","version":"2.0.0","database":"connected" if DATABASE_URL else "local-only"}
+def health():
+ if not DATABASE_URL:
+  return {"status":"degraded" if os.getenv("VERCEL") else "ok","version":"2.0.0","database":"not-configured"}
+ try:
+  import psycopg
+  with psycopg.connect(DATABASE_URL,connect_timeout=5) as c:
+   c.execute("SELECT 1")
+  return {"status":"ok","version":"2.0.0","database":"connected"}
+ except Exception:
+  log.exception("Database health check failed.")
+  return {"status":"degraded","version":"2.0.0","database":"authentication-or-connection-error"}
 @app.get("/api/tickets")
 def list_tickets():return {"tickets":tickets()}
 @app.post("/api/tickets")
